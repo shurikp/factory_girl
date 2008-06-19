@@ -40,6 +40,7 @@ class Factory
     @factory_name = factory_name_for(name)
     @options      = options
     @attributes   = []
+    @callbacks = {}
   end
 
   # Adds an attribute that should be assigned on generated instances for this
@@ -128,7 +129,38 @@ class Factory
   def create (attrs = {}) #:nodoc:
     instance = build_instance(attrs, :create)
     instance.save!
+    @callbacks[:after_create].call(instance) unless @callbacks[:after_create].nil?
     instance
+  end
+
+  # Allows a block to be evaluated after the factory object has been built, but before 
+  # it is saved to the database.  The block is passed the instance so you can do stuff 
+  # to it. For example, maybe you want to stub a method whose result normally relies on 
+  # complex computation on attributes and associations:
+  #
+  #   Factory.define :a_boy_that_never_goes_out, :class => Boy do |f|
+  #     f.name 'Morrisey'
+  #     f.after_build do |b|
+  #       b.stubs(:goes_out).returns(false)
+  #     end
+  #   end
+  def after_build(&block)
+    @callbacks[:after_build] = block
+  end
+
+  # Allows a block to be evaluated after the factory object has been saved to the 
+  # database.  The block is passed the instance so you can do stuff to it. For example
+  # maybe you want to stub a method whose result normally relies on complex computation
+  # on attributes and associations:
+  #
+  #   Factory.define :a_boy_that_never_goes_out, :class => Boy do |f|
+  #     f.name 'Morrisey'
+  #     f.after_create do |b|
+  #       b.stubs(:goes_out).returns(false)
+  #     end
+  #   end
+  def after_create(&block)
+    @callbacks[:after_create] = block
   end
 
   class << self
@@ -218,6 +250,7 @@ class Factory
     attrs.each do |attr, value|
       instance.send(:"#{attr}=", value)
     end
+    @callbacks[:after_build].call(instance) unless @callbacks[:after_build].nil?
     instance
   end
 
